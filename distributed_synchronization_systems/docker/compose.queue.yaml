@@ -1,0 +1,46 @@
+version: "3.9"
+services:
+  redis:
+    image: redis
+    container_name: redis-queue
+    ports:
+      - "6379:6379"
+
+  queue_node_0:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queue
+    env_file: ../.env
+    environment:
+      - PORT=8000
+      - PEERS=http://queue_node_1:8001,http://queue_node_2:8002
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+
+  queue_node_1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queue
+    env_file: ../.env
+    environment:
+      - PORT=8001
+      - PEERS=http://queue_node_0:8000,http://queue_node_2:8002
+    depends_on:
+      - redis
+    ports:
+      - "8001:8001"
+
+  queue_node_2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queueS
+    env_file: ../.env
+    environment:
+      - PORT=8002
+      - PEERS=http://queue_node_0:8000,http://queue_node_1:8001
+    depends_on:
+      - redis
+    ports:
+      - "8002:8002"
