@@ -9,7 +9,7 @@ services:
       - PORT=8000
       - PEERS=http://cache_node_1:8001,http://cache_node_2:8002
     ports:
-      - "8000:8000"
+      - "7000:8000"
 
   cache_node_1:
     build:
@@ -20,7 +20,7 @@ services:
       - PORT=8001
       - PEERS=http://cache_node_0:8000,http://cache_node_2:8002
     ports:
-      - "8001:8001"
+      - "7001:8001"
 
   cache_node_2:
     build:
@@ -31,4 +31,4 @@ services:
       - PORT=8002
       - PEERS=http://cache_node_0:8000,http://cache_node_1:8001
     ports:
-      - "8002:8002"
+      - "7002:8002"

@@ -6,7 +6,7 @@
 # 1. Cluster Lock Manager
 
 ## 1.1 Arsitektur Sistem
-Cluster Lock Manager menggunakan **Raft Consensus Algorithm** untuk menjaga konsistensi lock di lingkungan terdistribusi. Terdapat minimal 3 node yang saling berkomunikasi. Setiap node dapat menjadi leader atau follower.
+Cluster Lock Manager menggunakan **Raft Consensus Algorithm** untuk menjaga konsistensi lock di sistem terdistribusi. Terdapat minimal 3 node yang saling berkomunikasi. Setiap node dapat menjadi leader atau follower.
 
 - **Leader** bertanggung jawab memproses permintaan **exclusive lock**.
 - **Shared lock** bisa diproses oleh beberapa node tergantung konsensus.

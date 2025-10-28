@@ -1,4 +1,3 @@
-# src/nodes/cache_node.py
 import asyncio
 from aiohttp import web
 from src.nodes.base_node import BaseNode
