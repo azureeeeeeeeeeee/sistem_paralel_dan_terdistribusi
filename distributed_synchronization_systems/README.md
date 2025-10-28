@@ -255,7 +255,17 @@ docker-compose -f docker/docker-compose.queue.yml up --build
 ```
 
 ---
-# 4. Youtube Video (Demo Proyek)
+# 4. Test
+Run pytest with
+```
+pytest -v tests/unit/xxxx.py
+```
+
+di mana xxxx adalah nama file test yang ingin dijalankan
+
+
+---
+# 5. Youtube Video (Demo Proyek)
 ```
 https://youtu.be/6WQaNUHV3p4
 ```

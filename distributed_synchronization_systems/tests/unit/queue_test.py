@@ -3,9 +3,8 @@ import pytest
 import asyncio
 from aiohttp import ClientSession
 
-# Ganti port sesuai node yang sedang berjalan
-LEADER_PORT = 8002
-FOLLOWER_PORT = 8001
+LEADER_PORT = 9002
+FOLLOWER_PORT = 9001
 
 @pytest.mark.asyncio
 async def test_enqueue_leader():

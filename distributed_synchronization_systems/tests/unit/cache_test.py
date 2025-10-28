@@ -2,8 +2,8 @@ import pytest
 import aiohttp
 import asyncio
 
-LEADER_PORT = 8000
-FOLLOWER_PORT = 8001
+LEADER_PORT = 7000
+FOLLOWER_PORT = 7001
 BASE_LEADER = f"http://localhost:{LEADER_PORT}"
 BASE_FOLLOWER = f"http://localhost:{FOLLOWER_PORT}"
 
