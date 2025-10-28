@@ -6,12 +6,12 @@ from src.utils.config import setup_logger, get_config, get_peers
 import aiohttp
 from collections import OrderedDict
 
-MAX_CACHE_SIZE = 100  # maksimal item di cache
+MAX_CACHE_SIZE = 50
 
 class CacheNode(BaseNode):
     def __init__(self, port):
         super().__init__(port)
-        self.cache = OrderedDict()  # untuk LRU
+        self.cache = OrderedDict()  # LRU
         self.session = None
         self.metrics = {"hits": 0, "misses": 0, "evictions": 0}
         self.logger.info(f"Cache Node initialized on port {self.port}")
@@ -20,7 +20,6 @@ class CacheNode(BaseNode):
         data = await request.json()
         key = data["key"]
 
-        # default cache entry if key not present
         cache_entry = self.cache.get(key, {"value": None, "state": "I"})
         value, state = cache_entry["value"], cache_entry["state"]
 
@@ -29,15 +28,12 @@ class CacheNode(BaseNode):
             self.logger.info(f"Cache MISS for key '{key}' (state={state})")
 
             if self.raft.is_leader:
-                # Leader just returns its own value if available
                 value = self.cache.get(key, {}).get("value")
                 if value is None:
                     self.cache[key] = {"value": None, "state": "I"}
                 else:
                     self.cache[key]["state"] = "M"
             elif self.raft.leader_id:
-                # Follower: fetch from leader
-                # Find leader URL from peers list (docker-friendly)
                 leader_peer = next((p for p in self.peers if str(self.raft.leader_id) in p), None)
                 if leader_peer:
                     leader_url = f"{leader_peer}/get"
@@ -47,7 +43,6 @@ class CacheNode(BaseNode):
                                 if resp.status == 200:
                                     leader_data = await resp.json()
                                     value = leader_data.get("value")
-                                    # Follower cache state: Shared if value exists
                                     self.cache[key] = {
                                         "value": value,
                                         "state": "S" if value is not None else "I"
@@ -66,15 +61,12 @@ class CacheNode(BaseNode):
                     value = None
                     self.cache[key] = {"value": None, "state": "I"}
             else:
-                # No leader info
                 value = None
                 self.cache[key] = {"value": None, "state": "I"}
         else:
-            # Cache hit
             self.metrics["hits"] += 1
             self.logger.info(f"Cache HIT for key '{key}', state={state}")
 
-        # Update LRU
         if key in self.cache:
             self.cache.move_to_end(key)
 
@@ -96,18 +88,15 @@ class CacheNode(BaseNode):
                 "leader_id": self.raft.leader_id
             }, status=400)
 
-        # Update cache state ke Modified
         self.cache[key] = {"value": value, "state": "M"}
         self.cache.move_to_end(key)
         self.logger.info(f"SET key '{key}' -> '{value}' (state=M)")
 
-        # LRU eviction
         if len(self.cache) > MAX_CACHE_SIZE:
             oldest_key, _ = self.cache.popitem(last=False)
             self.metrics["evictions"] += 1
             self.logger.info(f"LRU evict key '{oldest_key}'")
 
-        # Broadcast invalidate to peers (source="local")
         await self.broadcast_invalidate(key, source="local")
 
         return web.json_response({"status": "ok", "key": key, "value": value})
@@ -115,14 +104,13 @@ class CacheNode(BaseNode):
     async def handle_invalidate(self, request):
         data = await request.json()
         key = data["key"]
-        source = data.get("source", "peer")  # default is from peer
+        source = data.get("source", "peer")
 
         if key in self.cache:
             self.cache[key]["state"] = "I"
             self.cache[key]["value"] = None
             self.logger.info(f"INVALIDATE key '{key}' -> state=I (value removed)")
 
-            # Only broadcast if this is a local change on leader
             if source == "local" and self.raft.is_leader:
                 await self.broadcast_invalidate(key, source="local")
 
@@ -155,7 +143,6 @@ class CacheNode(BaseNode):
         ]
         await self.start_custom(extra_routes)
 
-        # Cleanup session saat app shutdown
         async def cleanup(app):
             if self.session:
                 await self.session.close()

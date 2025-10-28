@@ -9,17 +9,14 @@ import os
 class DistributedQueueNode(BaseNode):
     def __init__(self, port):
         super().__init__(port)
-        self.queues = {}  # memory queue
+        self.queues = {}
         self.delivered_messages = {}
         self.redis = None
         self.session = None
-        self.self_url = f"http://localhost:{self.port}"  # URL node ini
+        self.self_url = f"http://localhost:{self.port}"
 
-    # ----------------------
-    # REDIS INIT (Docker-ready)
-    # ----------------------
     async def init_redis(self):
-        REDIS_HOST = os.getenv("REDIS_HOST", "redis")  # default ke service name docker
+        REDIS_HOST = os.getenv("REDIS_HOST", "redis")
         REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
         for attempt in range(5):
             try:
@@ -31,17 +28,11 @@ class DistributedQueueNode(BaseNode):
                 await asyncio.sleep(2)
         raise ConnectionError(f"Could not connect to Redis at {REDIS_HOST}:{REDIS_PORT}")
 
-    # ----------------------
-    # CONSISTENT HASHING
-    # ----------------------
     def get_node_for_key(self, key):
         nodes = sorted(self.peers + [self.self_url])
         h = int(hashlib.sha256(key.encode()).hexdigest(), 16)
         return nodes[h % len(nodes)]
 
-    # ----------------------
-    # ENQUEUE
-    # ----------------------
     async def handle_enqueue(self, request):
         data = await request.json()
         queue = data["queue"]
@@ -51,7 +42,6 @@ class DistributedQueueNode(BaseNode):
 
         target_node = self.get_node_for_key(queue)
 
-        # Forward jika peer
         if target_node != self.self_url and not forwarded:
             data["forwarded"] = True
             async with ClientSession() as session:
@@ -59,14 +49,12 @@ class DistributedQueueNode(BaseNode):
                     result = await resp.json()
                     return web.json_response(result, status=resp.status)
 
-        # Jika node owner tapi bukan leader
         if self.raft.state != "leader":
             return web.json_response(
                 {"error": "Not leader", "leader_id": self.raft.leader_id},
                 status=400,
             )
 
-        # Leader → replicate log & apply
         command = {"action": "enqueue", "queue": queue, "message": message, "client_id": client_id}
         result = await self.raft.replicate_log(command)
         await self.apply_log_entry({"command": command})
@@ -80,9 +68,6 @@ class DistributedQueueNode(BaseNode):
             "message": f"Message enqueued to {queue} via leader"
         })
 
-    # ----------------------
-    # DEQUEUE
-    # ----------------------
     async def handle_dequeue(self, request):
         data = await request.json()
         queue = data["queue"]
@@ -105,9 +90,6 @@ class DistributedQueueNode(BaseNode):
 
         return web.json_response({"message": message})
 
-    # ----------------------
-    # ACK
-    # ----------------------
     async def handle_ack(self, request):
         data = await request.json()
         queue = data["queue"]
@@ -120,9 +102,6 @@ class DistributedQueueNode(BaseNode):
 
         return web.json_response({"status": "acknowledged"})
 
-    # ----------------------
-    # APPLY LOG ENTRY
-    # ----------------------
     async def apply_log_entry(self, entry):
         cmd = entry["command"]
         if cmd["action"] == "enqueue":
@@ -136,9 +115,6 @@ class DistributedQueueNode(BaseNode):
         else:
             self.logger.warning(f"Unknown command: {cmd}")
 
-    # ----------------------
-    # RECOVERY
-    # ----------------------
     async def recover_from_redis(self):
         keys = await self.redis.keys("*")
         for queue in keys:
@@ -150,11 +126,8 @@ class DistributedQueueNode(BaseNode):
         if hasattr(self.raft, "log"):
             for entry in self.raft.log:
                 await self.apply_log_entry(entry)
-            self.logger.info("♻️ Recovered state from Raft logs")
+            self.logger.info("Recovered state from Raft logs")
 
-    # ----------------------
-    # START NODE
-    # ----------------------
     async def start(self):
         await self.init_redis()
         await self.recover_from_redis()
@@ -169,9 +142,6 @@ class DistributedQueueNode(BaseNode):
         await self.start_custom(extra_routes)
 
 
-# ----------------------
-# RUN AS SCRIPT
-# ----------------------
 if __name__ == "__main__":
     import argparse
     from src.utils.config import get_config

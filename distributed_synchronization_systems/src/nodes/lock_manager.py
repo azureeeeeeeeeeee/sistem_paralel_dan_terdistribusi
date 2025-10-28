@@ -14,9 +14,6 @@ class DistributedLockManager(BaseNode):
         self.locks = {}
         self.logger.info(f"Distributed Lock Manager initialized on port {self.port}")
 
-    # ==========================================================
-    # ==========  CLIENT HANDLERS  =============================
-    # ==========================================================
     async def handle_acquire_lock(self, request):
         if not self.raft.is_leader:
             return web.json_response({"error": "Not a leader"}, status=403)
@@ -28,17 +25,14 @@ class DistributedLockManager(BaseNode):
 
         lock = self.locks.get(resource)
 
-        # Belum ada lock
         if lock is None:
             self.locks[resource] = {"owner": [client_id], "mode": mode}
             return web.json_response({"status": "lock_acquired"})
 
-        # Shared lock
         if mode == "shared" and lock["mode"] == "shared":
             lock["owner"].append(client_id)
             return web.json_response({"status": "lock_acquired_shared"})
 
-        # Exclusive lock sudah ada
         return web.json_response({"error": "resource_locked"}, status=409)
 
     async def handle_release_lock(self, request):
@@ -60,11 +54,9 @@ class DistributedLockManager(BaseNode):
         return web.json_response({"status": "lock_released"})
 
     async def handle_get_locks(self, request):
-        """Debug: lihat semua lock"""
         return web.json_response(self.locks)
 
     async def handle_status(self, request):
-        """Status node dan cluster"""
         status = {
             "state": self.raft.state,
             "leader_id": self.raft.leader_id,
@@ -73,11 +65,7 @@ class DistributedLockManager(BaseNode):
         }
         return web.json_response(status)
 
-    # ==========================================================
-    # ==========  RAFT LOG APPLICATION  ========================
-    # ==========================================================
     async def apply_log_entry(self, entry):
-        """Dijalankan setelah log di-commit oleh Raft"""
         cmd = entry["command"]
         action = cmd["action"]
         resource = cmd["resource"]
@@ -96,48 +84,38 @@ class DistributedLockManager(BaseNode):
             self.logger.warning(f"Unknown command: {cmd}")
             return {"status": "error"}
 
-    # ==========================================================
-    # ==========  CORE LOCK LOGIC  =============================
-    # ==========================================================
     def _acquire(self, resource, mode, client):
-        """Internal logic acquire shared/exclusive lock"""
         if resource not in self.locks:
-            # Tidak ada lock → langsung bisa diambil
             if mode == "shared":
                 self.locks[resource] = {"mode": "shared", "owners": {client}}
-                self.logger.info(f"🔓 Shared lock acquired for {resource} by {client}")
+                self.logger.info(f"Shared lock acquired for {resource} by {client}")
             else:
                 self.locks[resource] = {"mode": "exclusive", "owner": client}
-                self.logger.info(f"🔒 Exclusive lock acquired for {resource} by {client}")
+                self.logger.info(f"Exclusive lock acquired for {resource} by {client}")
             return True
 
-        # Sudah ada lock
         current = self.locks[resource]
 
-        # CASE 1: Resource di-lock secara shared
         if current["mode"] == "shared":
             if mode == "shared":
                 current["owners"].add(client)
-                self.logger.info(f"🔁 Shared lock added for {resource} by {client}")
+                self.logger.info(f"Shared lock added for {resource} by {client}")
                 return True
             else:
-                # Minta exclusive tapi masih ada shared lock aktif
-                self.logger.warning(f"❌ Cannot acquire EXCLUSIVE lock on {resource}; shared locks active")
+                self.logger.warning(f"Cannot acquire EXCLUSIVE lock on {resource}; shared locks active")
                 return False
 
-        # CASE 2: Resource di-lock secara exclusive
         elif current["mode"] == "exclusive":
             if current["owner"] == client:
-                self.logger.info(f"⚠️ {client} already owns exclusive lock on {resource}")
+                self.logger.info(f"{client} already owns exclusive lock on {resource}")
                 return True
             else:
-                self.logger.warning(f"❌ Cannot acquire lock; {resource} owned exclusively by {current['owner']}")
+                self.logger.warning(f"Cannot acquire lock; {resource} owned exclusively by {current['owner']}")
                 return False
 
     def _release(self, resource, client):
-        """Internal logic release lock"""
         if resource not in self.locks:
-            self.logger.warning(f"⚠️ Attempt to release non-existent lock {resource}")
+            self.logger.warning(f"Attempt to release non-existent lock {resource}")
             return False
 
         current = self.locks[resource]
@@ -145,27 +123,24 @@ class DistributedLockManager(BaseNode):
         if current["mode"] == "shared":
             if client in current["owners"]:
                 current["owners"].remove(client)
-                self.logger.info(f"🔓 Shared lock released for {resource} by {client}")
+                self.logger.info(f"Shared lock released for {resource} by {client}")
                 if not current["owners"]:
                     del self.locks[resource]
-                    self.logger.info(f"🧹 All shared locks released for {resource}")
+                    self.logger.info(f"All shared locks released for {resource}")
                 return True
             else:
-                self.logger.warning(f"⚠️ {client} has no shared lock on {resource}")
+                self.logger.warning(f"{client} has no shared lock on {resource}")
                 return False
 
         elif current["mode"] == "exclusive":
             if current["owner"] == client:
                 del self.locks[resource]
-                self.logger.info(f"🔓 Exclusive lock released for {resource} by {client}")
+                self.logger.info(f"Exclusive lock released for {resource} by {client}")
                 return True
             else:
-                self.logger.warning(f"⚠️ {client} tried to release lock owned by {current['owner']}")
+                self.logger.warning(f"{client} tried to release lock owned by {current['owner']}")
                 return False
 
-    # ==========================================================
-    # ==========  START SERVER  ================================
-    # ==========================================================
     async def start(self):
         extra_routes = [
             web.post("/acquire_lock", self.handle_acquire_lock),

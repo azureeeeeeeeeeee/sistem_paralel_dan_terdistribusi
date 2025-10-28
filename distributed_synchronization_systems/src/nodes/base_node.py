@@ -12,7 +12,6 @@ class BaseNode:
         self.peers = get_peers(port)
         self.logger = setup_logger(port)
 
-        # Core raft logic
         self.raft = Raft(
             port=port,
             peers=self.peers,
@@ -22,7 +21,6 @@ class BaseNode:
     async def handle_root(self, request):
         return web.Response(text=f"Node running on port {self.port}")
 
-    # Default RPC handlers -- could be overridden or just used
     async def handle_heartbeat(self, request):
         data = await request.json()
         response = await self.raft.receive_heartbeat(data)
@@ -42,14 +40,12 @@ class BaseNode:
         """Handle client requests — replicate a command through Raft."""
         data = await request.json()
 
-        # pastikan hanya leader yang boleh menulis
         if self.raft.state != "leader":
             return web.json_response({
                 "error": "Not leader",
                 "leader_id": self.raft.leader_id
             }, status=400)
 
-        # replicate command (akan disebar ke semua follower)
         result = await self.raft.replicate_log(data)
         return web.json_response(result)
 
@@ -71,9 +67,8 @@ class BaseNode:
         site = web.TCPSite(runner, "0.0.0.0", self.port)
         await site.start()
 
-        self.logger.info(f"🚀 Node started on port {self.port}, peers: {self.peers}")
+        self.logger.info(f"Node started on port {self.port}, peers: {self.peers}")
 
-        # Jalankan raft di background
         asyncio.create_task(self.raft.run())
 
         # Biarkan server tetap hidup

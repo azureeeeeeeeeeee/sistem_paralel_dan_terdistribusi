@@ -35,7 +35,7 @@ services:
   queue_node_2:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.queueS
+      dockerfile: docker/Dockerfile.queue
     env_file: ../.env
     environment:
       - PORT=8002
