@@ -25,7 +25,7 @@ Cluster Lock Manager menggunakan **Raft Consensus Algorithm** untuk menjaga kons
 - Exclusive (write)
 
 
-## 1.3 API Documentation (Request-Response Format)
+## 1.3 API Documentation
 
 ### Acquire Lock (POST /acquire_lock)
 
@@ -83,30 +83,12 @@ Response 404 (no lock found):
 }
 ```
 
-### Get Locks (GET /locks) – Debug / Inspect all locks
+## 1.4 Deployment Guide
 
-```text
-GET /locks
+**Deployment:**
 
-Response 200:
-{
-  "resourceA": {"mode": "exclusive", "owner": "client-5000"},
-  "resourceB": {"mode": "shared", "owners": ["client-5000", "client-5001"]}
-}
-```
-
-### Node Status (GET /status)
-
-```text
-GET /status
-
-Response 200:
-{
-  "state": "leader",
-  "leader_id": "node-7000",
-  "port": 7000,
-  "locks": 2
-}
+```bash
+docker-compose -f docker/docker-compose.lock_manager.yml up --build
 ```
 
 ---
@@ -129,42 +111,6 @@ Cache Node menggunakan **MESI protocol** untuk menjaga cache coherence antar nod
    - **Invalid**: cache perlu di-refresh
 2. **LRU Replacement:**
    - Saat cache penuh, entry yang **paling lama tidak diakses** akan dihapus
-
-## 2.3 API Documentation (OpenAPI Spec)
-```yaml
-openapi: 3.0.3
-info:
-  title: Distributed Cache Node API
-  version: 1.0.0
-paths:
-  /cache/{key}:
-    get:
-      summary: Get value from cache
-      parameters:
-        - in: path
-          name: key
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Value returned
-        '404':
-          description: Key not found
-    post:
-      summary: Set value in cache
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                value:
-                  type: string
-      responses:
-        '200':
-          description: Cache updated
-```
 
 ## 2.3 API Documentation
 
@@ -231,7 +177,7 @@ Response 200:
 ```
 
 
-## 2.4 Deployment Guide & Troubleshooting
+## 2.4 Deployment Guide
 
 **Deployment:**
 
@@ -300,7 +246,7 @@ Response 200 (queue empty):
 }
 ```
 
-## 3.4 Deployment Guide & Troubleshooting
+## 3.4 Deployment Guide
 
 **Deployment:**
 
